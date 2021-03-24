@@ -10,7 +10,6 @@ import com.amazonaws.util.AWSRequestMetrics;
 import com.amazonaws.util.TimingInfo;
 import com.deevvi.httpstatuscode.HttpStatusCodeType;
 import com.google.common.base.Joiner;
-import com.google.common.collect.Lists;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.util.StringUtils;
 import org.apache.http.HttpHeaders;
@@ -27,6 +26,11 @@ public final class PrometheusExporterRequestHandler extends RequestHandler2 {
     private static final String ATTEMPT = "attempt";
     private static final String LATENCY = "latency";
     private static final String CONTENT_LENGTH = "content_length";
+    private static final String SYMBOL_REGEX = "[-.+]+";
+    private static final String EMPTY_STRING = "";
+    private static final String REGION = "region";
+    private static final String STATUS = "status";
+
     /**
      * Prometheus client handler.
      */
@@ -38,29 +42,15 @@ public final class PrometheusExporterRequestHandler extends RequestHandler2 {
     private final String metricPrefix;
 
     /**
-     * Flag to set if request handler should publish metrics per region or not.
-     */
-    private final boolean publishPerRegionMetrics;
-
-    /**
-     * Flag to set if request handler should publish global metrics.
-     */
-    private final boolean publishGlobalMetrics;
-
-    /**
      * Constructor.
      *
-     * @param meterRegistry           - Prometheus handler
-     * @param metricPrefix            - string used to prefix metrics name
-     * @param publishPerRegionMetrics - flag to set if request handler should publish metrics per region or not
-     * @param publishGlobalMetrics    - flag to set if request handler should publish global metrics
+     * @param meterRegistry - Prometheus handler
+     * @param metricPrefix  - string used to prefix metrics name
      */
-    public PrometheusExporterRequestHandler(MeterRegistry meterRegistry, String metricPrefix, boolean publishPerRegionMetrics, boolean publishGlobalMetrics) {
+    public PrometheusExporterRequestHandler(MeterRegistry meterRegistry, String metricPrefix) {
         super();
         this.meterRegistry = meterRegistry;
         this.metricPrefix = StringUtils.isNotBlank(metricPrefix) ? metricPrefix : null;
-        this.publishPerRegionMetrics = publishPerRegionMetrics;
-        this.publishGlobalMetrics = publishGlobalMetrics;
     }
 
     /**
@@ -69,9 +59,10 @@ public final class PrometheusExporterRequestHandler extends RequestHandler2 {
     @Override
     public void afterAttempt(HandlerAfterAttemptContext context) {
         if (context.getException() != null && context.getException() instanceof AmazonServiceException) {
-            fetchStatus((AmazonServiceException) context.getException())
-                    .ifPresent(val -> buildKeyPrefix(context.getRequest())
-                            .forEach(keyPrefix -> meterRegistry.summary(merge(metricPrefix, keyPrefix, ATTEMPT, val.name()), Lists.newArrayList()).record(1)));
+            String status = fetchStatus((AmazonServiceException) context.getException());
+            String keyPrefix = buildKeyPrefix(context.getRequest());
+            String region = context.getRequest().getHandlerContext(HandlerContextKey.SIGNING_REGION);
+            meterRegistry.summary(merge(metricPrefix, keyPrefix, ATTEMPT), REGION, region, STATUS, status).record(1);
         }
     }
 
@@ -81,11 +72,12 @@ public final class PrometheusExporterRequestHandler extends RequestHandler2 {
     @Override
     public void afterResponse(Request<?> request, Response<?> response) {
 
-        List<String> prefixes = buildKeyPrefix(request);
+        String prefix = buildKeyPrefix(request);
+        String region = request.getHandlerContext(HandlerContextKey.SIGNING_REGION);
+        String status = fetchStatus(response);
 
-        fetchLatency(request).ifPresent(val -> prefixes.forEach(prefix -> meterRegistry.summary(merge(metricPrefix, prefix, LATENCY), Lists.newArrayList()).record(val)));
-        fetchContentLength(response).ifPresent(val -> prefixes.forEach(prefix -> meterRegistry.summary(merge(metricPrefix, prefix, CONTENT_LENGTH), Lists.newArrayList()).record(val)));
-        fetchStatus(response).ifPresent(val -> prefixes.forEach(prefix -> meterRegistry.summary(merge(metricPrefix, prefix, val.name()), Lists.newArrayList()).record(1)));
+        fetchLatency(request).ifPresent(val -> meterRegistry.summary(merge(metricPrefix, prefix, LATENCY), REGION, region, STATUS, status).record(val));
+        fetchContentLength(response).ifPresent(val -> meterRegistry.summary(merge(metricPrefix, prefix, CONTENT_LENGTH), REGION, region, STATUS, status).record(val));
     }
 
     /**
@@ -94,35 +86,26 @@ public final class PrometheusExporterRequestHandler extends RequestHandler2 {
     @Override
     public void afterError(Request<?> request, Response<?> response, Exception exception) {
 
-        List<String> prefixes = buildKeyPrefix(request);
+
+        String prefix = buildKeyPrefix(request);
+        String region = request.getHandlerContext(HandlerContextKey.SIGNING_REGION);
 
         if (exception instanceof AmazonServiceException) {
-            fetchStatus((AmazonServiceException) exception)
-                    .ifPresent(val -> prefixes.forEach(prefix -> meterRegistry.summary(merge(metricPrefix, prefix, val.name()), Lists.newArrayList()).record(1)));
+            String status = fetchStatus((AmazonServiceException) exception);
+            meterRegistry.summary(merge(metricPrefix, prefix), REGION, region, STATUS, status).record(1);
+            fetchLatency(request).ifPresent(val -> meterRegistry.summary(merge(metricPrefix, prefix, LATENCY), REGION, region, STATUS, status).record(val));
+            fetchContentLength(response).ifPresent(val -> meterRegistry.summary(merge(metricPrefix, prefix, CONTENT_LENGTH), REGION, region, STATUS, status).record(val));
         }
 
-        fetchLatency(request)
-                .ifPresent(val -> prefixes.forEach(prefix -> meterRegistry.summary(merge(metricPrefix, prefix, LATENCY), Lists.newArrayList()).record(val)));
-        fetchContentLength(response)
-                .ifPresent(val -> prefixes.forEach(prefix -> meterRegistry.summary(merge(metricPrefix, prefix, CONTENT_LENGTH), Lists.newArrayList()).record(val)));
+
     }
 
-    private List<String> buildKeyPrefix(Request<?> request) {
-        List<String> prefixes = Lists.newArrayList();
-        if (publishGlobalMetrics || publishPerRegionMetrics) {
-            String serviceId = request.getHandlerContext(HandlerContextKey.SERVICE_ID);
-            String apiName = request.getHandlerContext(HandlerContextKey.OPERATION_NAME);
+    private String buildKeyPrefix(Request<?> request) {
 
-            if (publishGlobalMetrics) {
-                prefixes.add(sanitize(Joiner.on(KEY_SEPARATOR).join(serviceId, apiName)));
-            }
-            if (publishPerRegionMetrics) {
-                String region = request.getHandlerContext(HandlerContextKey.SIGNING_REGION);
-                prefixes.add(sanitize(Joiner.on(KEY_SEPARATOR).join(serviceId, apiName, region)));
-            }
+        String serviceId = request.getHandlerContext(HandlerContextKey.SERVICE_ID);
+        String apiName = request.getHandlerContext(HandlerContextKey.OPERATION_NAME);
 
-        }
-        return prefixes;
+        return sanitize(Joiner.on(KEY_SEPARATOR).join(serviceId, apiName));
     }
 
     private Optional<Integer> fetchContentLength(Response<?> response) {
@@ -135,18 +118,18 @@ public final class PrometheusExporterRequestHandler extends RequestHandler2 {
         return Optional.empty();
     }
 
-    private Optional<HttpStatusCodeType> fetchStatus(Response<?> response) {
+    private String fetchStatus(Response<?> response) {
         if (response != null && response.getHttpResponse() != null) {
-            return Optional.of(HttpStatusCodeType.resolve(response.getHttpResponse().getStatusCode()));
+            return HttpStatusCodeType.resolve(response.getHttpResponse().getStatusCode()).name().toLowerCase();
         }
-        return Optional.empty();
+        return EMPTY_STRING;
     }
 
-    private Optional<HttpStatusCodeType> fetchStatus(AmazonServiceException exception) {
+    private String fetchStatus(AmazonServiceException exception) {
         if (exception != null) {
-            return Optional.of(HttpStatusCodeType.resolve(exception.getStatusCode()));
+            return HttpStatusCodeType.resolve(exception.getStatusCode()).name().toLowerCase();
         }
-        return Optional.empty();
+        return EMPTY_STRING;
     }
 
     private String sanitize(String raw) {
@@ -154,7 +137,7 @@ public final class PrometheusExporterRequestHandler extends RequestHandler2 {
     }
 
     private String merge(String... parts) {
-        return Joiner.on(KEY_SEPARATOR).skipNulls().join(parts);
+        return Joiner.on(KEY_SEPARATOR).skipNulls().join(parts).replaceAll(SYMBOL_REGEX, KEY_SEPARATOR);
     }
 
     private Optional<Long> fetchLatency(Request<?> request) {

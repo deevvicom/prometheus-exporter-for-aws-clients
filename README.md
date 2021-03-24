@@ -1,3 +1,5 @@
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.deevvi/prometheus-exporter-for-aws-clients/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.deevvi/prometheus-exporter-for-aws-clients)
+
 Prometheus Exporter for AWS clients
 
 Why:
@@ -13,22 +15,22 @@ The recommended way to use this library is through your build tool.
 
 The prometheus-exporter-for-aws-clients artifact is published to Maven Central, using the group com.deevvi.
 
-Latest stable version is 1.0.0.
+Latest stable version is 1.0.2.
 
 Therefore,it can be added to your Gradle project by adding the dependencies:
 
-compile "com.deevvi:prometheus-exporter-for-aws-clients:1.0.0"
+compile "com.deevvi:prometheus-exporter-for-aws-clients:1.0.2"
 and in Maven:
 
 <dependency>
     <groupId>com.deevvi</groupId>
     <artifactId>prometheus-exporter-for-aws-clients</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.2</version>
 </dependency>
 Code example:
 
 MeterRegistry meterRegistry = new SimpleMeterRegistry();
-RequestHandler2 prometheusHandler = new PrometheusExporterRequestHandler(meterRegistry, "my-app-name", true, false);
+RequestHandler2 prometheusHandler = new PrometheusExporterRequestHandler(meterRegistry, "my-app-name");
 
 AmazonSQSClientBuilder.standard()
         .withCredentials(new SystemPropertiesCredentialsProvider())

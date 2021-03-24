@@ -18,7 +18,6 @@ import org.mockito.Mockito;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
-import static org.mockito.ArgumentMatchers.anyIterable;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -33,7 +32,7 @@ import static org.mockito.Mockito.when;
 public class PrometheusExporterRequestHandlerTest {
 
     private MeterRegistry meterRegistry = Mockito.mock(MeterRegistry.class);
-    private PrometheusExporterRequestHandler handler = new PrometheusExporterRequestHandler(meterRegistry, "prefix", true, true);
+    private PrometheusExporterRequestHandler handler = new PrometheusExporterRequestHandler(meterRegistry, "prefix");
 
     @DisplayName("No metric published when afterAttempt() call has no exception found")
     @Test
@@ -66,17 +65,17 @@ public class PrometheusExporterRequestHandlerTest {
         when(request.getHandlerContext(HandlerContextKey.OPERATION_NAME)).thenReturn("operation");
         when(request.getHandlerContext(HandlerContextKey.SIGNING_REGION)).thenReturn("region");
         DistributionSummary summary = Mockito.mock(DistributionSummary.class);
-        when(meterRegistry.summary(anyString(), anyIterable())).thenReturn(summary);
+        when(meterRegistry.summary(anyString(), anyString(), anyString(), anyString(), anyString())).thenReturn(summary);
 
         //call
         handler.afterAttempt(ctx);
 
         //verify
         verify(ctx, times(3)).getException();
-        verify(meterRegistry, times(2)).summary(anyString(), anyIterable());
-        verify(summary, times(2)).record(1);
+        verify(meterRegistry, times(1)).summary(anyString(), anyString(), anyString(), anyString(), anyString());
+        verify(summary, times(1)).record(1);
         verify(request, times(3)).getHandlerContext(any());
-        verify(ctx, times(1)).getRequest();
+        verify(ctx, times(2)).getRequest();
         verifyNoMoreInteractions(ctx, meterRegistry, summary, request);
     }
 
@@ -104,7 +103,7 @@ public class PrometheusExporterRequestHandlerTest {
         when(httpResponse.getHeaderValues(anyString())).thenReturn(ImmutableList.of("1000"));
         when(httpResponse.getStatusCode()).thenReturn(200);
         DistributionSummary summary = Mockito.mock(DistributionSummary.class);
-        when(meterRegistry.summary(anyString(), anyIterable())).thenReturn(summary);
+        when(meterRegistry.summary(anyString(), anyString(), anyString(), anyString(), anyString())).thenReturn(summary);
         //call
         handler.afterResponse(request, response);
 
@@ -118,8 +117,8 @@ public class PrometheusExporterRequestHandlerTest {
         verify(httpResponse, times(1)).getHeaderValues("Content-Length");
         verify(httpResponse, times(1)).getStatusCode();
 
-        verify(meterRegistry, times(6)).summary(anyString(), anyIterable());
-        verify(summary, times(6)).record(anyDouble());
+        verify(meterRegistry, times(2)).summary(anyString(), anyString(), anyString(), anyString(), anyString());
+        verify(summary, times(2)).record(anyDouble());
 
         verifyNoMoreInteractions(request, response, metrics, timingInfo, httpResponse, meterRegistry, summary);
     }
@@ -141,7 +140,7 @@ public class PrometheusExporterRequestHandlerTest {
         when(request.getHandlerContext(HandlerContextKey.SIGNING_REGION)).thenReturn("eu-west-1");
 
         DistributionSummary summary = Mockito.mock(DistributionSummary.class);
-        when(meterRegistry.summary(anyString(), anyIterable())).thenReturn(summary);
+        when(meterRegistry.summary(anyString(), anyString(), anyString(), anyString(), anyString())).thenReturn(summary);
 
         //call
         handler.afterError(request, response, exception);
@@ -151,8 +150,8 @@ public class PrometheusExporterRequestHandlerTest {
         verify(request, times(3)).getHandlerContext(any());
         verify(response, times(1)).getHttpResponse();
 
-        verify(meterRegistry, times(2)).summary(anyString(), anyIterable());
-        verify(summary, times(2)).record(anyDouble());
+        verify(meterRegistry, times(1)).summary(anyString(), anyString(), anyString(), anyString(), anyString());
+        verify(summary, times(1)).record(anyDouble());
 
         verifyNoMoreInteractions(request, response, meterRegistry, summary);
     }
