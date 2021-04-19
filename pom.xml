@@ -6,7 +6,7 @@
 
     <groupId>com.deevvi</groupId>
     <artifactId>prometheus-exporter-for-aws-clients</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.3</version>
 
     <name>Prometheus Exporter for AWS clients library</name>
     <description>Lightweight Request Handler to add on any AWS client in order to obtain Prometheus metrics.</description>

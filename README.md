@@ -16,11 +16,11 @@
 
  - The prometheus-exporter-for-aws-clients artifact is published to Maven Central, using the group *com.deevvi* .
 
- - Latest stable version is *1.0.2*.
+ - Latest stable version is *1.0.3*.
 
 Therefore,it can be added to your Gradle project by adding the dependencies:
 
-```compile "com.deevvi:prometheus-exporter-for-aws-clients:1.0.2" ```
+```compile "com.deevvi:prometheus-exporter-for-aws-clients:1.0.3" ```
 
 and in Maven:
 
@@ -28,7 +28,7 @@ and in Maven:
 <dependency>
     <groupId>com.deevvi</groupId>
     <artifactId>prometheus-exporter-for-aws-clients</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.3</version>
 </dependency>
 ```
 

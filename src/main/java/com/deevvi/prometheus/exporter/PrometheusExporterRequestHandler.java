@@ -15,6 +15,7 @@ import io.micrometer.core.instrument.util.StringUtils;
 import org.apache.http.HttpHeaders;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -30,6 +31,7 @@ public final class PrometheusExporterRequestHandler extends RequestHandler2 {
     private static final String EMPTY_STRING = "";
     private static final String REGION = "region";
     private static final String STATUS = "status";
+    private static final String SPACE = " ";
 
     /**
      * Prometheus client handler.
@@ -111,8 +113,12 @@ public final class PrometheusExporterRequestHandler extends RequestHandler2 {
     private Optional<Integer> fetchContentLength(Response<?> response) {
         if (response != null && response.getHttpResponse() != null) {
             List<String> headerValue = response.getHttpResponse().getHeaderValues(HttpHeaders.CONTENT_LENGTH);
-            if (!headerValue.isEmpty()) {
-                return Optional.of(Integer.valueOf(headerValue.get(0)));
+            if (Objects.nonNull(headerValue) && !headerValue.isEmpty()) {
+                try {
+                    return Optional.of(Integer.valueOf(headerValue.get(0)));
+                } catch (NumberFormatException e) {
+                    return Optional.empty();
+                }
             }
         }
         return Optional.empty();
@@ -133,7 +139,7 @@ public final class PrometheusExporterRequestHandler extends RequestHandler2 {
     }
 
     private String sanitize(String raw) {
-        return raw.replaceAll(" ", KEY_SEPARATOR);
+        return raw.replaceAll(SPACE, KEY_SEPARATOR);
     }
 
     private String merge(String... parts) {
