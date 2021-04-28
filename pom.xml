@@ -6,7 +6,7 @@
 
     <groupId>com.deevvi</groupId>
     <artifactId>prometheus-exporter-for-aws-clients</artifactId>
-    <version>1.0.3</version>
+    <version>1.0.4</version>
 
     <name>Prometheus Exporter for AWS clients library</name>
     <description>Lightweight Request Handler to add on any AWS client in order to obtain Prometheus metrics.</description>
@@ -47,8 +47,8 @@
     </distributionManagement>
 
     <dependencies>
-        <!-- AWS -->
 
+        <!-- AWS -->
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-core</artifactId>
@@ -72,7 +72,7 @@
         <dependency>
             <groupId>com.deevvi</groupId>
             <artifactId>http-status-code</artifactId>
-            <version>1.0.0</version>
+            <version>1.1.0</version>
         </dependency>
 
         <!--Testing-->
